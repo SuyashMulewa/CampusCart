@@ -19,6 +19,19 @@ export default function WishlistPage() {
           <div className="flex flex-col md:flex-row gap-8">
             <UserSidebar activeItem="wishlist" />
             <div className="flex-1">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">My Wishlist</h1>
+                  <p className="text-gray-500">0 saved items</p>
+                </div>
+                <Link to="/home">
+                  <Button variant="outline" className="gap-2">
+                    Continue Shopping
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                </Link>
+              </div>
+
               <div className="rounded-xl border border-gray-100 p-12 text-center">
                 <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Heart className="w-10 h-10 text-gray-400" />

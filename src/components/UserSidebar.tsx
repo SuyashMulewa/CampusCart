@@ -5,8 +5,10 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
   User, 
+  Bell,
   Package, 
   ClipboardList, 
+  ShoppingCart,
   Heart, 
   Settings, 
   LogOut,
@@ -16,8 +18,10 @@ import { useLogout } from '@/state';
 
 const menuItems = [
   { id: 'profile', label: 'Profile', icon: User, href: '/profile' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, href: '/notifications' },
   { id: 'orders', label: 'My Orders', icon: Package, href: '/orders' },
   { id: 'listings', label: 'My Listings', icon: ClipboardList, href: '/listings' },
+  { id: 'cart', label: 'Cart', icon: ShoppingCart, href: '/cart', search: '?view=sidebar' },
   { id: 'wishlist', label: 'Wishlist', icon: Heart, href: '/wishlist' },
   { id: 'settings', label: 'Settings', icon: Settings, href: '/settings' },
 ];
@@ -40,7 +44,7 @@ export default function UserSidebar({ activeItem }: UserSidebarProps) {
           {menuItems.map((item) => {
             const isActive = currentActive === item.id;
             return (
-              <Link key={item.id} to={item.href}>
+              <Link key={item.id} to={item.search ? { pathname: item.href, search: item.search } : item.href}>
                 <motion.div
                   whileHover={{ x: 2 }}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${

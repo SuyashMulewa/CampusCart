@@ -1,7 +1,7 @@
 /**
  * Reusable app component: N av ba r.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {  
@@ -15,6 +15,8 @@ import {
   X,
   Heart,
   Package,
+  ClipboardList,
+  Settings,
   LogOut,
   Check
 } from 'lucide-react';
@@ -31,6 +33,7 @@ import { getProfileVerificationCompletion, isUserFullyVerified } from '@/utils/p
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { data: user } = useCurrentUser();
   const logoutMutation = useLogout();
@@ -40,8 +43,19 @@ export default function Navbar() {
   const { data: notificationCount = 0 } = useUnreadNotificationCount();
   const navigate = useNavigate();
   const location = useLocation();
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const profileCompletion = getProfileVerificationCompletion(user);
   const canBuySell = isUserFullyVerified(user);
+
+  const profileMenuItems = [
+    { label: 'Profile', to: '/profile', icon: User },
+    { label: 'Notifications', to: '/notifications', icon: Bell },
+    { label: 'My Orders', to: '/orders', icon: Package },
+    { label: 'My Listings', to: '/listings', icon: ClipboardList },
+    { label: 'My Cart', to: '/cart?view=sidebar', icon: ShoppingCart },
+    { label: 'Wishlist', to: '/wishlist', icon: Heart },
+    { label: 'Settings', to: '/settings', icon: Settings },
+  ];
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,6 +64,21 @@ export default function Navbar() {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setIsProfileMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setIsProfileMenuOpen(false);
+  }, [location.pathname, location.search]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,8 +160,9 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <>
                   <NavIcon icon={LayoutGrid} label="Categories" to="/searchresultspage" />
-                  <NavIcon icon={Bell} label="Notifications" to="/notifications" badge={notificationCount} />
                   <NavIcon icon={ShoppingCart} label="Cart" to="/cart" badge={cartCount} />
+                  <NavIcon icon={Heart} label="Wishlist" to="/wishlist" badge={wishlistCount} />
+                  <NavIcon icon={Bell} label="Notifications" to="/notifications" badge={notificationCount} />
                   
                   {/* Sell Button */}
                   <motion.button
@@ -146,17 +176,55 @@ export default function Navbar() {
                   </motion.button>
 
                   {/* User Dropdown */}
-                  <div className="relative ml-2">
-                    <Link to="/profile">
-                      <motion.div whileHover={{ scale: 1.05 }} className="relative cursor-pointer">
-                        <ProfileProgressAvatar
-                          completion={profileCompletion}
-                          isVerified={canBuySell}
-                          avatar={user?.avatar}
-                          name={user?.name}
-                        />
-                      </motion.div>
-                    </Link>
+                  <div className="relative ml-2" ref={profileMenuRef}>
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+                      className="rounded-full p-1 hover:bg-gray-100 transition-colors"
+                      aria-label="Open profile menu"
+                    >
+                      <ProfileProgressAvatar
+                        completion={profileCompletion}
+                        isVerified={canBuySell}
+                        avatar={user?.avatar}
+                        name={user?.name}
+                      />
+                    </motion.button>
+
+                    <AnimatePresence>
+                      {isProfileMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 8 }}
+                          className="absolute right-0 mt-2 w-56 bg-white border border-gray-100 rounded-xl shadow-lg overflow-hidden z-50"
+                        >
+                          <div className="p-2">
+                            {profileMenuItems.map((item) => (
+                              <Link
+                                key={item.label}
+                                to={item.to}
+                                onClick={() => setIsProfileMenuOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                              >
+                                <item.icon className="w-4 h-4 text-gray-500" />
+                                <span className="font-medium text-sm">{item.label}</span>
+                              </Link>
+                            ))}
+                          </div>
+                          <div className="border-t border-gray-100 p-2">
+                            <button
+                              onClick={handleLogout}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <LogOut className="w-4 h-4" />
+                              <span className="font-medium text-sm">Logout</span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </>
               ) : (

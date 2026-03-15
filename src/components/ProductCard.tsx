@@ -159,7 +159,7 @@ export default function ProductCard({
               onClick={handleToggleWishlist}
               className="absolute top-2 right-2 p-0 bg-transparent hover:bg-transparent transition-colors"
             >
-              <Heart className={`w-4 h-4 ${isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
+              <Heart className={`w-5 h-5 ${isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
             </button>
           </div>
           <div className="p-3">
@@ -198,7 +198,7 @@ export default function ProductCard({
             onClick={handleToggleWishlist}
             className="absolute top-3 right-3 p-0 bg-transparent hover:bg-transparent transition-colors"
           >
-            <Heart className={`w-6 h-6 ${isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
+            <Heart className={`w-5 h-5 ${isFavorited ? 'fill-red-500 text-red-500' : 'text-gray-500'}`} />
           </button>
         </div>
         <div className="p-4 flex flex-col flex-1">
