@@ -113,7 +113,7 @@ export default function SellerProfilePage() {
                 <div className="flex items-center gap-1">
                   <Star className="w-4 h-4 text-[#F5B800] fill-[#F5B800]" />
                   <span className="font-medium">{seller.rating}</span>
-                  <span className="text-gray-400">({seller.reviewCount} reviews)</span>
+                  <span className="text-gray-400">({'reviewCount' in seller ? seller.reviewCount : 0} reviews)</span>
                 </div>
                 <div className="flex items-center gap-1 text-gray-500">
                   <MapPin className="w-4 h-4" />

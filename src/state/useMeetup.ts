@@ -72,9 +72,9 @@ export function useConfirmMeetup() {
     },
     onSuccess: () => {
       // When both confirm, this cascades to order confirmation + OTP generation
-      qc.invalidateQueries({ queryKey: queryKeys.meetups });
+      qc.invalidateQueries({ queryKey: ['meetups'] });
       qc.invalidateQueries({ queryKey: queryKeys.orders.all });
-      qc.invalidateQueries({ queryKey: queryKeys.otp });
+      qc.invalidateQueries({ queryKey: ['otp'] });
       qc.invalidateQueries({ queryKey: queryKeys.chat.conversations });
     },
   });

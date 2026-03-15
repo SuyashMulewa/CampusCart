@@ -14,7 +14,7 @@ let mockTransactions: Transaction[] = [];
 
 export const api = {
   // Listings
-  async getListings(params?: Record<string, any>): Promise<Listing[]> {
+  async getListings(_params?: Record<string, any>): Promise<Listing[]> {
     // TODO: Replace with real fetch/axios call:
     // return fetch('/api/listings?' + new URLSearchParams(params)).then(r => r.json());
     return Promise.resolve(mockListings);
@@ -41,7 +41,7 @@ export const api = {
   },
 
   // Auth
-  async login(email: string, password: string): Promise<{ token: string; user: User } | null> {
+  async login(email: string, _password: string): Promise<{ token: string; user: User } | null> {
     // TODO: POST /api/auth/login
     const user = mockUsers.find(u => u.email === email);
     if (user) return { token: 'mock-token', user };
@@ -53,7 +53,7 @@ export const api = {
     mockUsers.push(newUser);
     return { token: 'mock-token', user: newUser };
   },
-  async getMe(token: string): Promise<User | null> {
+  async getMe(_token: string): Promise<User | null> {
     // TODO: GET /api/user/me
     return mockUsers[0] || null;
   },

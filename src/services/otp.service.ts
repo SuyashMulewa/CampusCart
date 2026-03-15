@@ -46,9 +46,8 @@ export async function generate(meetupId: string, orderId: string) {
     orderId,
     code,
     isVerified: false,
+    generatedAt: now,
     expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), // 30 min
-    createdAt: now,
-    updatedAt: now,
   };
 
   await otpRepository.create(otp);
@@ -104,7 +103,7 @@ export async function verify(meetupId: string, code: string) {
   }
 
   // Mark OTP as verified
-  await otpRepository.verify(otp.id, code);
+  await otpRepository.verify(meetupId, code);
 
   // Complete the order (confirmed → completed via state machine)
   const order = await orderRepository.getById(otp.orderId);

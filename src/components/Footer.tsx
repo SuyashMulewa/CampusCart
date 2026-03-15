@@ -3,7 +3,7 @@
  */
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ShoppingBag, Facebook, Instagram, Twitter, Linkedin, Mail } from 'lucide-react';
+import { Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 
 const footerLinks = {
   marketplace: [

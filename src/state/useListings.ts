@@ -7,7 +7,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as listingService from '@/services/listing.service';
 import type { CreateListingDTO, UpdateListingDTO } from '@/models';
-import type { Product } from '@/data/mockData';
 import { listingToProduct } from '@/utils/compat';
 import { EVENTS } from '@/events/events';
 import { queryKeys } from './queryKeys';

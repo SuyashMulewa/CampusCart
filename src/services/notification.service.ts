@@ -117,7 +117,6 @@ export async function create(dto: CreateNotificationDTO) {
     relatedEntityType: dto.relatedEntityType,
     isRead: false,
     createdAt: now,
-    updatedAt: now,
   };
 
   await notificationRepository.create(notification);

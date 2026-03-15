@@ -133,7 +133,7 @@ export async function confirm(meetupId: string) {
   const role = order.buyerId === userId ? 'buyer' : 'seller';
 
   // Confirm
-  const updated = await meetupRepository.confirmByUser(meetupId, userId, role);
+  const updated = await meetupRepository.confirmByUser(meetupId, role);
 
   // Send confirmation message
   await sendSystemMessage(

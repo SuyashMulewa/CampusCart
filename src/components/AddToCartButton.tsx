@@ -28,7 +28,7 @@ export function AddToCartButton({
   const { data: user } = useCurrentUser();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
-  const timeoutRef = useRef<number | undefined>();
+  const timeoutRef = useRef<number | undefined>(undefined);
 
   const alreadyInCart = isInCart(product.id);
 

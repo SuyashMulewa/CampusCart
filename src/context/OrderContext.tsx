@@ -1,7 +1,7 @@
 /**
  * Provides shared order state for pending purchases so the UI can remember in-progress bids across navigation.
  */
-import React, {
+import {
   createContext,
   useContext,
   useState,

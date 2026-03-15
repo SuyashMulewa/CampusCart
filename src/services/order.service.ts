@@ -20,7 +20,6 @@ import { EVENTS } from '@/events/events';
 import { transitionOrder } from '@/utils/orderStateMachine';
 import { getCurrentUserId } from './auth.service';
 import type { Order } from '@/models/order.model';
-import type { OrderStatus } from '@/models/enums';
 import { simulateLatency, wrapResponse, throwApiError } from './base.service';
 
 /** Enriched order with joined user and listing data for UI display */

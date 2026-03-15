@@ -3,7 +3,7 @@
  */
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Search, ChevronDown, MessageCircle, Shield, BookOpen, Truck, CreditCard, User } from 'lucide-react';
+import { ChevronDown, MessageCircle, Shield, BookOpen, Truck, CreditCard, User } from 'lucide-react';
 
 const helpCategories = [
   {
@@ -62,7 +62,7 @@ const faqs = [
 ];
 
 export default function HelpCenterPage() {
-  const [searchQuery, setSearchQuery] = useState('');
+  // const [searchQuery, setSearchQuery] = useState('');
   const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
   return (

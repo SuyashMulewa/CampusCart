@@ -14,7 +14,11 @@
 import type { Table } from 'dexie';
 
 export class BaseRepository<T extends { id: string }> {
-  constructor(protected table: Table<T, string>) {}
+  protected table: Table<T, string>;
+
+  constructor(table: Table<T, string>) {
+    this.table = table;
+  }
 
   /** Get a single record by primary key. Returns undefined if not found. */
   async getById(id: string): Promise<T | undefined> {
@@ -34,7 +38,7 @@ export class BaseRepository<T extends { id: string }> {
 
   /** Update an existing record (full or partial). Merges with existing data. */
   async update(id: string, changes: Partial<T>): Promise<T> {
-    await this.table.update(id, changes);
+    await this.table.update(id, changes as never);
     const updated = await this.table.get(id);
     if (!updated) throw new Error(`Entity with id "${id}" not found after update`);
     return updated;

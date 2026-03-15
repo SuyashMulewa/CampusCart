@@ -40,12 +40,17 @@ export interface ApiResponse<T> {
  * API error shape — thrown by services, caught by TanStack Query.
  */
 export class ApiError extends Error {
+  code: number;
+  details?: string;
+
   constructor(
-    public code: number,
+    code: number,
     message: string,
-    public details?: string,
+    details?: string,
   ) {
     super(message);
     this.name = 'ApiError';
+    this.code = code;
+    this.details = details;
   }
 }

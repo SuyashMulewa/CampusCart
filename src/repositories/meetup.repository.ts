@@ -27,7 +27,6 @@ class MeetupRepository extends BaseRepository<Meetup> {
    */
   async confirmByUser(
     meetupId: string,
-    userId: string,
     role: 'buyer' | 'seller'
   ): Promise<Meetup> {
     const meetup = await this.table.get(meetupId);

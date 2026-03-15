@@ -10,7 +10,7 @@
  */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as authService from '@/services/auth.service';
-import type { CreateUserDTO, UpdateUserDTO, User } from '@/models';
+import type { CreateUserDTO, UpdateUserDTO } from '@/models';
 import { queryKeys } from './queryKeys';
 
 // ─── Queries ──────────────────────────────────────────

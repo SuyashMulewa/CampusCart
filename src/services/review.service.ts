@@ -37,8 +37,7 @@ export async function submit(dto: CreateReviewDTO) {
   }
 
   // Check if already reviewed
-  const existing = await reviewRepository.findByOrder(dto.orderId);
-  const alreadyReviewed = existing.find((r) => r.reviewerId === userId);
+  const alreadyReviewed = await reviewRepository.findByOrder(dto.orderId, userId);
   if (alreadyReviewed) {
     throwApiError(400, 'You have already reviewed this order');
   }
@@ -52,22 +51,18 @@ export async function submit(dto: CreateReviewDTO) {
     rating: dto.rating,
     comment: dto.comment ?? '',
     createdAt: now,
-    updatedAt: now,
   };
 
   await reviewRepository.create(review);
 
   // Update reviewee's average rating
-  const avgRating = await reviewRepository.getAverageRating(dto.revieweeId);
-  if (avgRating !== null) {
-    await userRepository.updateRating(dto.revieweeId, avgRating);
-  }
+  const ratingStats = await reviewRepository.getAverageRating(dto.revieweeId);
+  await userRepository.updateRating(dto.revieweeId, ratingStats.average, ratingStats.count);
 
   eventBus.emit(EVENTS.REVIEW_SUBMITTED, {
     reviewId: review.id,
     orderId: dto.orderId,
     revieweeId: dto.revieweeId,
-    rating: dto.rating,
   });
 
   return wrapResponse(review);
