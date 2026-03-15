@@ -1,7 +1,3 @@
-Here’s a comprehensive README for your project, based on your workspace structure and context:
-
----
-
 # CampusCart Marketplace
 
 CampusCart is a modern React + TypeScript web application for campus-based buying, selling, and communication. Built with Vite, it features a clean UI, robust state management, and modular architecture for easy expansion.
