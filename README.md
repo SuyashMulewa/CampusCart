@@ -1,73 +1,97 @@
-# React + TypeScript + Vite
+Here’s a comprehensive README for your project, based on your workspace structure and context:
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+---
 
-Currently, two official plugins are available:
+# CampusCart Marketplace
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+CampusCart is a modern React + TypeScript web application for campus-based buying, selling, and communication. Built with Vite, it features a clean UI, robust state management, and modular architecture for easy expansion.
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Marketplace:** Browse, search, and filter products (textbooks, electronics, dorm essentials, etc.).
+- **User Account:** Authentication, profile completion, wishlist, cart, notifications, and order management.
+- **Communication:** Integrated chat for negotiation and support.
+- **Sidebar & Navbar:** Quick access to cart, notifications, wishlist, and user profile.
+- **Responsive UI:** Mobile-friendly layouts, animated hero section, and category icon grid.
+- **State Management:** TanStack Query for data fetching and caching.
+- **Custom Components:** Modular UI (ProductCard, AddToCartButton, ListingEditor, etc.).
+- **Context Providers:** Auth, Cart, Notification, Order, Wishlist.
+- **Hooks:** Custom hooks for listings, chat, events, meetups, notifications, orders, reviews, and authentication.
+- **Database Layer:** Local mock database and seed scripts for development.
+- **Repository & Service Pattern:** Clean separation for business logic and data access.
 
-## Expanding the ESLint configuration
+## Tech Stack
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- **Frontend:** React, TypeScript, Vite
+- **UI:** Tailwind CSS, framer-motion, lucide-react icons
+- **State:** TanStack Query, React Context
+- **Testing:** ESLint, type-aware linting
+- **Build:** Vite, PostCSS
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## Project Structure
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+  api/                // API client and docs
+  components/         // UI components (cards, forms, dialogs, etc.)
+  context/            // React Context providers
+  data/               // Mock data and static lists
+  db/                 // Local database and seed scripts
+  events/             // Event bus and event definitions
+  hooks/              // Custom React hooks
+  lib/                // Utility functions
+  models/             // TypeScript models and enums
+  pages/              // Page components (auth, marketplace, user, etc.)
+  repositories/       // Data access layer
+  services/           // Business logic layer
+  state/              // Query client, providers, hooks
+  types/              // Shared types
+  utils/              // Misc utilities
+public/
+  images/             // Static assets (hero illustrations, icons)
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Getting Started
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+1. **Install dependencies:**
+   ```
+   npm install
+   ```
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+2. **Run the development server:**
+   ```
+   npm run dev
+   ```
+
+3. **Build for production:**
+   ```
+   npm run build
+   ```
+
+4. **Lint and format:**
+   ```
+   npm run lint
+   ```
+
+## Customization & Expansion
+
+- Add new product categories in universities.ts or `mockData.ts`.
+- Extend UI components in components.
+- Add new pages in pages.
+- Update business logic in services and repositories.
+- Enhance state management in state.
+
+## Contributing
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Push and open a pull request.
+
+## License
+
+MIT
+
+---
+
+Let me know if you want to add deployment instructions, API details, or any other specifics!
