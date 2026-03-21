@@ -20,10 +20,12 @@ export function useCurrentUser() {
   return useQuery({
     queryKey: queryKeys.auth.me,
     queryFn: async () => {
-      const userId = authService.getCurrentUserId();
-      if (!userId) return null;
-      const res = await authService.getMe();
-      return res.data;
+      try {
+        const res = await authService.getMe();
+        return res.data;
+      } catch {
+        return null;
+      }
     },
     staleTime: Infinity, // Session doesn't go stale — only mutations change it
   });

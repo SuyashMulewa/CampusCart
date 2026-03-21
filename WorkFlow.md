@@ -1,277 +1,257 @@
-Here is your **cleaned, structured, developer-ready workflow prompt** — rewritten clearly, logically ordered, and without repetition or ambiguity.
-You can now use this for **system design, database planning, or giving to an AI / development team**.
+# CampusCart Project Workflow
+
+## 1. Product Intent
+
+CampusCart is a student marketplace where the same account can act as both buyer and seller. 
+Transactions are marketplace-first (listing and bidding), then conversation-driven (chat + meetup), and finally trust-verified (OTP at physical handoff).
+
+This document defines the current end-to-end workflow the project should follow across UI, services, events, and state updates.
 
 ---
 
-## ✅ Cleaned & Structured Platform Workflow (Developer Specification)
+## 2. Roles and Access Model
 
-### **Project Overview**
-
-This platform is a **student marketplace** where users can act as both **buyers and sellers** to trade academic resources or products through bidding or direct purchase, followed by an offline meetup with OTP verification.
-
-The frontend is currently **70–80% complete**, and the goal is to finalize backend architecture, database design, and implementation workflow.
-
----
-
-## **1. User Roles**
-
-Each registered user can perform both roles:
-
-* **Buyer**
-* **Seller**
-
-Role depends on the action performed, not account type.
+- Each authenticated user can list products, place bids, chat, and complete orders.
+- Role is contextual:
+  - Seller: owner of a listing/order.
+  - Buyer: bidder or direct purchaser of a listing.
+- Marketplace feed must exclude listings created by the currently logged-in seller.
 
 ---
 
-## **2. Seller Workflow**
+## 3. Listing Lifecycle (Seller Side)
 
-### **2.1 Create Listing**
+### 3.1 Create Listing
 
-Seller creates a product listing with:
+Seller creates a listing with:
 
-* Product title
-* Description
-* Images
-* Category
-* Condition
-* listing price
-* MRP
-* Negotiable minimum price (minimum bid limit)
+- title
+- description
+- images
+- category
+- condition
+- listing price
+- MRP (optional display value)
+- negotiable minimum price (minimum acceptable bid)
+
+Expected behavior:
+
+- Listing is visible to other users immediately after creation.
+- Seller does not see own listing in discovery feed.
+
+### 3.2 Manage Listing
+
+From Profile → My Listings, seller can:
+
+- view own listings
+- edit listing data
+- delete listing
+- open bids for a listing
+
+### 3.3 Listing Events
+
+On listing mutations, system emits:
+
+- `listing:created`
+- `listing:updated`
+- `listing:deleted`
+
+These events drive UI refresh and query invalidation for listing screens.
+
+---
+
+## 4. Buying and Bidding Lifecycle
+
+### 4.1 Buyer Discovery
+
+Buyer browses listings, opens detail view, and chooses:
+
+- place bid
+- buy now (at listing price)
+
+### 4.2 Place Bid
 
 Rules:
 
-* Seller **cannot see their own listing** in the marketplace browsing feed.
-* Listing becomes visible to other users immediately after creation.
+- Bid amount must be greater than or equal to seller minimum negotiable price.
+
+System actions:
+
+- Save bid.
+- Create or update related conversation/order context.
+- Push initial automated chat message.
+- Set order status to `pending` when order entity is created.
+
+### 4.3 Buy Now
+
+Rules:
+
+- Buy now behaves as an immediate bid at listing price.
+
+System actions are same as place bid flow, with bid amount equal to listing price.
+
+### 4.4 Seller Bid Decision
+
+In View Bids page, seller can:
+
+- inspect bidder details and amounts
+- accept (finalize order)
+- reject
+
+Related events:
+
+- `bid:placed`
+- `bid:accepted`
+- `bid:rejected`
+- `order:created`
+- `order:status_changed`
 
 ---
 
-### **2.2 Manage Listings**
+## 5. Chat and Negotiation Workflow
 
-From **Profile → My Listings**, seller can:
+Chat is the operational channel between buyer and seller.
 
-* View all listed products
-* Edit product details
-* Delete listing
-* View bids received
+### 5.1 Conversation Behavior
 
----
+- Conversation starts or becomes active after bid/buy-now action.
+- System can send guided messages (for next step prompts).
+- Users exchange plain messages and meetup coordination updates.
 
-### **2.3 View Bids**
+### 5.2 Chat Events
 
-Inside **View Bids Page**, seller sees:
+- `conversation:created`
+- `message:received`
 
-* Current price
-* Total number of bids
-* List of interested buyers
-* Bid amounts
-* Buyer details (name, university)
-
-Seller actions:
-
-* Finalize Order (accept a buyer)
-* Reject bid
+These events update chat lists, message threads, unread counts, and notification badges.
 
 ---
 
-### **2.4 Finalize Order**
+## 6. Meetup Workflow
 
-When seller selects **Finalize Order**:
+### 6.1 Proposal
 
-A quick chat dialog opens allowing seller to:
+Seller proposes meetup details:
 
-* Set meetup details:
+- location
+- date
+- time
 
-  * Location
-  * Date
-  * Time
+Buyer can confirm or request changes. Flow remains iterative until both accept.
 
-Meetup request is sent to the buyer.
-both can either confirm/change meetup details as required.
+### 6.2 Locking
 
----
+When both parties confirm:
 
-## **3. Buyer Workflow**
+- meetup status is locked
+- countdown begins
 
-### **3.1 Browse Products**
+Events:
 
-Buyer can:
+- `meetup:proposed`
+- `meetup:confirmed`
+- `meetup:locked`
 
-* Browse listings
-* View product details
-* Choose between:
+### 6.3 Restricted Phase
 
-  * Buy at listed price
-  * Place a bid
+One hour before meetup, restricted meetup UI appears with:
 
----
-
-### **3.2 Place Bid**
-
-Buyer must enter a price:
-
-* Bid value ≥ seller’s negotiable minimum price.
-
-After submission:
-
-* Bid is recorded.
-* Automated message appears in chat.
-* Order status created (pending)
+- OTP verification entry
+- call option
+- issue/report option
+- close action (unlocked only after successful OTP verification)
 
 ---
 
-### **3.3 Buy Now**
+## 7. OTP Verification Workflow
 
-If buyer clicks **Buy Now**:
+### 7.1 OTP Generation
 
-* Buyer agrees to purchase at seller’s listed price.
-* System creates a bid equal to listing price.
+- OTP is generated after meetup confirmation/lock stage.
+- OTP is visible only to buyer.
 
-* Bid is recorded.
-* Automated message appears in chat.
-* Order status created (pending)
+### 7.2 Physical Handoff Validation
 
----
+- Buyer shares OTP in person with seller.
+- Seller submits OTP in app.
+- System verifies OTP and valid meetup/order context.
 
-### **3.4 Order Tracking**
+Events:
 
-From **Profile → My Orders**, buyer sees order status:
+- `otp:generated`
+- `otp:verified`
 
-* Pending
-* Confirmed
-* Completed
-* Cancelled
+### 7.3 Post-Verification
 
-Buyer can open chat with seller.
-
----
-
-## **4. Chat System (Buyer ↔ Seller)**
-
-Chat includes:
-
-* Seller information header with online/offline status
-* Automated initial message after bid submission
-* Automated seller message:
-
-  > “Wait until I send meetup details.”
-
-Chat supports actions:
-
-* only Messaging meetup details using option set meetup
-* System updates automatic message when needed
-* Once the meet up details is sent Options like Confirm meetup detaiks Or change meetup details are provided.
+- Restricted close state unlocks.
+- Order transitions to `completed`.
+- Completion screens and review prompts become available.
 
 ---
 
-## **5. Meetup Scheduling Workflow**
+## 8. Order State Machine
 
-### **5.1 Meetup Proposal**
+Canonical order lifecycle:
 
-Seller sends meetup details.
+`pending` → `confirmed` → `completed`
 
-Receiver (buyer/seller) can:
+Cancellation branch:
 
-* Confirm meetup
-* Request changes
+`pending` or `confirmed` → `cancelled`
 
----
-
-### **5.2 Confirmation**
-
-Once both users confirm:
-
-* Meetup becomes locked.
-* Countdown timer starts.
+State updates must emit `order:status_changed`.
 
 ---
 
-### **5.3 Restricted Meetup UI**
+## 9. Completion and Review Flow
 
-Activated **1 hour before meetup**.
-
-Restricted screen includes:
-
-* OTP verification system
-* Call option
-* Report issue
-* close (which remove restricted ui)
-
+- Buyer: redirected to home (or primary marketplace screen) and prompted for review/rating.
+- Seller: shown sale completion summary.
+- Review submission emits `review:submitted` and can trigger profile/rating refresh.
 
 ---
 
-## **6. OTP Authentication (Offline Verification)**
+## 10. Data and State Synchronization (Current Frontend Pattern)
 
-* System generates OTP after meetup confirmation.
-* OTP is shown only to **buyer**.
-* Buyer shares OTP physically with seller during meetup.
+Workflow consistency is maintained via typed query keys and event-driven invalidation.
 
-Seller submits OTP.
+### 10.1 Query Domains
 
-System verifies:
+- Auth: `['auth', 'me']`, `['auth', 'profile', userId]`
+- Listings: `['listings']`, detail, search, category, mine, categories
+- Bids: `['bids']`, by listing, mine
+- Orders: `['orders']`, buyer, seller, detail
+- Chat: conversations, messages, unread
+- Meetups: by order
+- OTP: by meetup
+- Reviews: for user, for order
+- Notifications: all, unread
 
-* OTP correctness
-* Both users present in meetup phase
+### 10.2 Core Principle
 
-After successful verification:
-
-* Locked Close button on meet authentication page UI of both users unlocks.
-* Transaction marked completed.
-
----
-
-## **7. Completion Flow**
-
-### Buyer:
-
-* Redirected to Home.
-* then a Review panel popup appears.
-
-### Seller:
-
-* Redirected to **Sale Completed Page** with transaction details.
+After any mutation (listing/bid/order/chat/meetup/otp/review), emit typed event and invalidate the smallest matching query scope first, then broader scope only when necessary.
 
 ---
 
-## **8. Core System States**
+## 11. Implementation Priorities
 
-### Order Status Lifecycle:
-
-```
-Pending → Confirmed → Completed
-            ↓
-         Cancelled
-```
+1. Keep flow logic centralized in service/repository layers.
+2. Keep UI components thin and event/query driven.
+3. Preserve strict state transitions for order and meetup statuses.
+4. Ensure OTP verification is mandatory for transaction completion.
+5. Maintain real-time responsiveness through event bus + TanStack Query invalidation.
 
 ---
 
-## **9. Key Functional Requirements**
+## 12. Backend Alignment Goal
 
-* Real-time bid updates
-* Role-based UI rendering
-* Seller cannot view own listings in marketplace feeds
-* Automated chat events
-* Meetup scheduling system
-* Countdown-based UI restriction
-* OTP-based offline transaction verification
-* Review & rating system
+Backend and database design must fully support:
 
----
+- listing and bidding at scale
+- deterministic order state transitions
+- persistent buyer-seller conversation history
+- meetup proposal/confirmation/lock lifecycle
+- secure OTP generation and verification
+- review and notification propagation
 
-## **10. Development Goal**
-
-Design a backend and database architecture that enables:
-
-* Seamless buyer–seller interaction
-* Real-time updates
-* Secure meetup verification
-* Scalable listing and bidding system
-
----
-
-If you want, next I can give you the **MOST IMPORTANT PART** developers usually miss:
-
-👉 **The exact database schema (tables + relationships) that fits THIS workflow perfectly**
-— including bids, orders, chat, meetup, OTP, and status transitions and more as needed for this project.
-
-That will basically become your backend blueprint.
+This workflow is the source-of-truth functional contract for implementation.

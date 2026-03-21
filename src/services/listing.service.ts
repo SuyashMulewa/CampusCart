@@ -1,25 +1,14 @@
 /**
- * Listing service — product listing CRUD and search.
- *
- * Simulates REST endpoints:
- *   GET    /listings            → getAll(filters?)
- *   GET    /listings/:id        → getById(id)
- *   POST   /listings            → create(dto)
- *   PATCH  /listings/:id        → update(id, dto)
- *   DELETE /listings/:id        → remove(id)
- *   GET    /listings/search     → search(query, filters)
- *   GET    /listings/category   → getByCategory(category)
- *   GET    /listings/mine       → getMine()
+ * Listing service — product listing CRUD and search (Supabase-backed).
  */
-import { listingRepository } from '@/repositories/listing.repository';
-import { categoryRepository } from '@/repositories/category.repository';
-import { userRepository } from '@/repositories/user.repository';
 import { eventBus } from '@/events/eventBus';
 import { EVENTS } from '@/events/events';
-import { getCurrentUserId } from './auth.service';
-import type { Listing, CreateListingDTO, UpdateListingDTO } from '@/models/listing.model';
+import { supabase } from '@/lib/supabase';
 import type { Category } from '@/models/category.model';
-import { simulateLatency, wrapResponse, throwApiError, generateId, timestamp } from './base.service';
+import type { Listing, CreateListingDTO, UpdateListingDTO } from '@/models/listing.model';
+import type { User } from '@/models/user.model';
+import { getCurrentUserId } from './auth.service';
+import { simulateLatency, wrapResponse, throwApiError } from './base.service';
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: 'textbooks', name: 'Textbook', icon: 'BookOpen', count: 0, listings: '0+' },
@@ -30,14 +19,119 @@ const DEFAULT_CATEGORIES: Category[] = [
   { id: 'dorm-essentials', name: 'Dorm Essentials', icon: 'HousePlus', count: 0, listings: '0+' },
 ];
 
-const CATEGORY_ORDER = [
-  'textbook',
-  'study notes',
-  'stationary',
-  'lab kits',
-  'electronics',
-  'dorm essentials',
-];
+const CATEGORY_ORDER = ['textbook', 'study notes', 'stationary', 'lab kits', 'electronics', 'dorm essentials'];
+
+const LISTING_SELECT = `
+  id,
+  sellerId:seller_id,
+  title,
+  description,
+  price,
+  mrp,
+  negotiableMinPrice:negotiable_min_price,
+  category,
+  condition,
+  location,
+  image,
+  images,
+  specifications,
+  status,
+  views,
+  favorites,
+  isNegotiable:is_negotiable,
+  postedDate:posted_date,
+  createdAt:created_at,
+  updatedAt:updated_at
+`;
+
+const SELLER_SELECT = `
+  id,
+  name,
+  email,
+  avatar,
+  university,
+  major,
+  year,
+  bio,
+  phone,
+  enrollmentNumber:enrollment_number,
+  studentIdCardPhoto:student_id_card_photo,
+  documentType:document_type,
+  documentPhoto:document_photo,
+  verificationSubmittedAt:verification_submitted_at,
+  role,
+  isVerified:is_verified,
+  isOnline:is_online,
+  lastSeen:last_seen,
+  rating,
+  reviewCount:review_count,
+  joinedDate:joined_date,
+  createdAt:created_at,
+  updatedAt:updated_at
+`;
+
+function toNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  return fallback;
+}
+
+function toListing(row: any): Listing {
+  return {
+    id: row.id,
+    sellerId: row.sellerId,
+    title: row.title,
+    description: row.description,
+    price: toNumber(row.price),
+    mrp: toNumber(row.mrp),
+    negotiableMinPrice: row.negotiableMinPrice == null ? null : toNumber(row.negotiableMinPrice),
+    category: row.category,
+    condition: row.condition,
+    location: row.location,
+    image: row.image,
+    images: Array.isArray(row.images) ? row.images : [],
+    specifications: row.specifications ?? undefined,
+    status: row.status,
+    views: toNumber(row.views),
+    favorites: toNumber(row.favorites),
+    isNegotiable: !!row.isNegotiable,
+    postedDate: row.postedDate,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+function toSeller(row: any): User {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    avatar: row.avatar,
+    university: row.university,
+    major: row.major ?? undefined,
+    year: row.year ?? undefined,
+    bio: row.bio ?? undefined,
+    phone: row.phone ?? undefined,
+    enrollmentNumber: row.enrollmentNumber ?? undefined,
+    studentIdCardPhoto: row.studentIdCardPhoto ?? undefined,
+    documentType: row.documentType ?? undefined,
+    documentPhoto: row.documentPhoto ?? undefined,
+    verificationSubmittedAt: row.verificationSubmittedAt ?? undefined,
+    role: row.role,
+    isVerified: !!row.isVerified,
+    isOnline: !!row.isOnline,
+    lastSeen: row.lastSeen,
+    rating: toNumber(row.rating),
+    reviewCount: toNumber(row.reviewCount),
+    joinedDate: row.joinedDate,
+    passwordHash: '',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
 
 function normalizeCategoryName(value: string): string {
   const lower = value.toLowerCase().trim();
@@ -81,6 +175,49 @@ function normalizeAndSortCategories(categories: Category[]): Category[] {
   });
 }
 
+function mergeWithDefaultCategories(categories: Category[]): Category[] {
+  const mergedById = new Map<string, Category>();
+
+  DEFAULT_CATEGORIES.forEach((category) => {
+    mergedById.set(category.id, {
+      ...category,
+      count: category.count ?? 0,
+      listings: category.listings ?? '0+',
+    });
+  });
+
+  categories.forEach((category) => {
+    const normalizedName = normalizeCategoryName(category.name);
+    const idCandidates = [
+      category.id,
+      slugify(category.id),
+      slugify(normalizedName),
+    ];
+
+    const matchedDefaultId = DEFAULT_CATEGORIES.find((defaultCategory) => {
+      const defaultCandidates = [
+        defaultCategory.id,
+        slugify(defaultCategory.id),
+        slugify(defaultCategory.name),
+      ];
+      return idCandidates.some((candidate) => defaultCandidates.includes(candidate));
+    })?.id;
+
+    const mergedId = matchedDefaultId ?? slugify(category.id || normalizedName);
+    const defaultMeta = DEFAULT_CATEGORIES.find((defaultCategory) => defaultCategory.id === mergedId);
+
+    mergedById.set(mergedId, {
+      id: mergedId,
+      name: defaultMeta?.name ?? normalizedName,
+      icon: defaultMeta?.icon ?? category.icon,
+      count: category.count ?? 0,
+      listings: category.listings ?? formatListingsCount(category.count ?? 0),
+    });
+  });
+
+  return normalizeAndSortCategories(Array.from(mergedById.values()));
+}
+
 function slugify(value: string): string {
   return value.toLowerCase().trim().replace(/\s+/g, '-');
 }
@@ -114,11 +251,6 @@ function getFallbackMetaFromValue(value: string): Category {
   };
 }
 
-/**
- * Get all active listings, optionally excluding the current user's own listings.
- * The `excludeSeller` flag implements the WorkFlow.md requirement:
- * "Seller cannot see their own listing in the marketplace browsing feed."
- */
 export async function getAll(filters?: {
   excludeSeller?: boolean;
   category?: string;
@@ -128,54 +260,50 @@ export async function getAll(filters?: {
 }) {
   await simulateLatency(100, 200);
 
-  let listings: Listing[];
   const currentUserId = getCurrentUserId();
 
-  if (filters?.excludeSeller && currentUserId) {
-    listings = await listingRepository.findExcludingSeller(currentUserId);
-  } else {
-    listings = (await listingRepository.getAll()).filter((l) => l.status === 'active');
-  }
+  let query = supabase.from('listings').select(LISTING_SELECT).eq('status', 'active');
 
-  // Apply additional filters
+  if (filters?.excludeSeller && currentUserId) {
+    query = query.neq('seller_id', currentUserId);
+  }
   if (filters?.category) {
-    listings = listings.filter((l) => l.category === filters.category);
+    query = query.eq('category', filters.category);
   }
   if (filters?.condition) {
-    listings = listings.filter((l) => l.condition === filters.condition);
+    query = query.eq('condition', filters.condition);
   }
   if (filters?.minPrice !== undefined) {
-    listings = listings.filter((l) => l.price >= filters.minPrice!);
+    query = query.gte('price', filters.minPrice);
   }
   if (filters?.maxPrice !== undefined) {
-    listings = listings.filter((l) => l.price <= filters.maxPrice!);
+    query = query.lte('price', filters.maxPrice);
   }
 
-  return wrapResponse(listings);
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) throwApiError(500, error.message);
+
+  return wrapResponse((data ?? []).map(toListing));
 }
 
-/**
- * Get a single listing by ID. Increments view count.
- * @throws ApiError(404) if listing not found
- */
 export async function getById(id: string) {
   await simulateLatency(50, 150);
 
-  const listing = await listingRepository.getById(id);
-  if (!listing) {
+  const { data, error } = await supabase
+    .from('listings')
+    .select(LISTING_SELECT)
+    .eq('id', id)
+    .single();
+
+  if (error || !data) {
     throwApiError(404, 'Listing not found');
   }
 
-  // Increment views (fire-and-forget)
-  listingRepository.incrementViews(id);
+  await supabase.rpc('increment_listing_views', { p_listing_id: id });
 
-  return wrapResponse(listing);
+  return wrapResponse(toListing(data));
 }
 
-/**
- * Create a new listing.
- * @throws ApiError(401) if not authenticated
- */
 export async function create(dto: CreateListingDTO) {
   await simulateLatency(200, 400);
 
@@ -184,44 +312,41 @@ export async function create(dto: CreateListingDTO) {
     throwApiError(401, 'Must be logged in to create a listing');
   }
 
-  const now = timestamp();
-  const listing: Listing = {
-    id: generateId('listing'),
-    sellerId,
+  const payload = {
+    seller_id: sellerId,
     title: dto.title,
     description: dto.description,
     price: dto.price,
     mrp: dto.mrp,
-    negotiableMinPrice: dto.isNegotiable ? (dto.negotiableMinPrice ?? null) : null,
+    negotiable_min_price: dto.isNegotiable ? (dto.negotiableMinPrice ?? null) : null,
     category: dto.category,
-    subcategory: dto.subcategory,
     condition: dto.condition,
     location: dto.location,
     image: dto.image,
-    images: dto.images || [dto.image],
-    specifications: dto.specifications,
+    images: dto.images && dto.images.length ? dto.images : [dto.image],
+    specifications: dto.specifications ?? null,
     status: 'active',
     views: 0,
     favorites: 0,
-    isNegotiable: dto.isNegotiable,
-    postedDate: now.split('T')[0],
-    createdAt: now,
-    updatedAt: now,
+    is_negotiable: dto.isNegotiable,
+    posted_date: new Date().toISOString(),
   };
 
-  await listingRepository.create(listing);
+  const { data, error } = await supabase
+    .from('listings')
+    .insert(payload)
+    .select(LISTING_SELECT)
+    .single();
 
-  eventBus.emit(EVENTS.LISTING_CREATED, { listingId: listing.id });
+  if (error || !data) {
+    throwApiError(500, error?.message || 'Failed to create listing');
+  }
 
-  return wrapResponse(listing);
+  eventBus.emit(EVENTS.LISTING_CREATED, { listingId: data.id });
+
+  return wrapResponse(toListing(data));
 }
 
-/**
- * Update an existing listing.
- * @throws ApiError(401) if not authenticated
- * @throws ApiError(403) if not the listing owner
- * @throws ApiError(404) if listing not found
- */
 export async function update(id: string, dto: UpdateListingDTO) {
   await simulateLatency(150, 300);
 
@@ -230,29 +355,51 @@ export async function update(id: string, dto: UpdateListingDTO) {
     throwApiError(401, 'Must be logged in');
   }
 
-  const listing = await listingRepository.getById(id);
-  if (!listing) {
+  const { data: existing, error: existingError } = await supabase
+    .from('listings')
+    .select('id, seller_id')
+    .eq('id', id)
+    .single();
+
+  if (existingError || !existing) {
     throwApiError(404, 'Listing not found');
   }
-  if (listing.sellerId !== sellerId) {
+
+  if (existing.seller_id !== sellerId) {
     throwApiError(403, 'You can only edit your own listings');
   }
 
-  const updated = await listingRepository.update(id, {
-    ...dto,
-    updatedAt: timestamp(),
-  });
+  const patch: Record<string, unknown> = {};
+  if (dto.title !== undefined) patch.title = dto.title;
+  if (dto.description !== undefined) patch.description = dto.description;
+  if (dto.price !== undefined) patch.price = dto.price;
+  if (dto.mrp !== undefined) patch.mrp = dto.mrp;
+  if (dto.negotiableMinPrice !== undefined) patch.negotiable_min_price = dto.negotiableMinPrice;
+  if (dto.category !== undefined) patch.category = dto.category;
+  if (dto.condition !== undefined) patch.condition = dto.condition;
+  if (dto.location !== undefined) patch.location = dto.location;
+  if (dto.image !== undefined) patch.image = dto.image;
+  if (dto.images !== undefined) patch.images = dto.images;
+  if (dto.specifications !== undefined) patch.specifications = dto.specifications;
+  if (dto.isNegotiable !== undefined) patch.is_negotiable = dto.isNegotiable;
+  if (dto.status !== undefined) patch.status = dto.status;
+
+  const { data, error } = await supabase
+    .from('listings')
+    .update(patch)
+    .eq('id', id)
+    .select(LISTING_SELECT)
+    .single();
+
+  if (error || !data) {
+    throwApiError(500, error?.message || 'Failed to update listing');
+  }
 
   eventBus.emit(EVENTS.LISTING_UPDATED, { listingId: id });
 
-  return wrapResponse(updated);
+  return wrapResponse(toListing(data));
 }
 
-/**
- * Delete (soft-delete) a listing.
- * @throws ApiError(401) if not authenticated
- * @throws ApiError(403) if not the listing owner
- */
 export async function remove(id: string) {
   await simulateLatency(100, 200);
 
@@ -261,28 +408,30 @@ export async function remove(id: string) {
     throwApiError(401, 'Must be logged in');
   }
 
-  const listing = await listingRepository.getById(id);
-  if (!listing) {
+  const { data: existing, error: existingError } = await supabase
+    .from('listings')
+    .select('id, seller_id')
+    .eq('id', id)
+    .single();
+
+  if (existingError || !existing) {
     throwApiError(404, 'Listing not found');
   }
-  if (listing.sellerId !== sellerId) {
+
+  if (existing.seller_id !== sellerId) {
     throwApiError(403, 'You can only delete your own listings');
   }
 
-  // Soft delete — mark as deleted
-  await listingRepository.update(id, { status: 'deleted', updatedAt: timestamp() });
-
-  // Hard delete — remove from IndexedDB
-  await listingRepository.delete(id);
+  const { error } = await supabase.from('listings').update({ status: 'deleted' }).eq('id', id);
+  if (error) {
+    throwApiError(500, error.message);
+  }
 
   eventBus.emit(EVENTS.LISTING_DELETED, { listingId: id });
 
   return wrapResponse({ id });
 }
 
-/**
- * Search listings by text query with optional filters.
- */
 export async function search(
   query: string,
   filters?: { category?: string; condition?: string; minPrice?: number; maxPrice?: number }
@@ -290,30 +439,42 @@ export async function search(
   await simulateLatency(100, 250);
 
   const currentUserId = getCurrentUserId();
-  const results = await listingRepository.search(query, {
-    ...filters,
-    excludeSellerId: currentUserId ?? undefined,
-  });
 
-  return wrapResponse(results);
+  let dbQuery = supabase.from('listings').select(LISTING_SELECT).eq('status', 'active');
+
+  if (currentUserId) {
+    dbQuery = dbQuery.neq('seller_id', currentUserId);
+  }
+
+  if (filters?.category) dbQuery = dbQuery.eq('category', filters.category);
+  if (filters?.condition) dbQuery = dbQuery.eq('condition', filters.condition);
+  if (filters?.minPrice !== undefined) dbQuery = dbQuery.gte('price', filters.minPrice);
+  if (filters?.maxPrice !== undefined) dbQuery = dbQuery.lte('price', filters.maxPrice);
+
+  if (query.trim()) {
+    dbQuery = dbQuery.or(`title.ilike.%${query.trim()}%,description.ilike.%${query.trim()}%`);
+  }
+
+  const { data, error } = await dbQuery.order('created_at', { ascending: false });
+  if (error) throwApiError(500, error.message);
+
+  return wrapResponse((data ?? []).map(toListing));
 }
 
-/**
- * Get all listings in a specific category.
- */
 export async function getByCategory(category: string) {
   await simulateLatency(80, 150);
 
-  const listings = await listingRepository.findByCategory(category);
-  const active = listings.filter((l) => l.status === 'active');
+  const { data, error } = await supabase
+    .from('listings')
+    .select(LISTING_SELECT)
+    .eq('category', category)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
 
-  return wrapResponse(active);
+  if (error) throwApiError(500, error.message);
+  return wrapResponse((data ?? []).map(toListing));
 }
 
-/**
- * Get the current user's own listings (for the "My Listings" page).
- * @throws ApiError(401) if not authenticated
- */
 export async function getMine() {
   await simulateLatency(80, 150);
 
@@ -322,29 +483,41 @@ export async function getMine() {
     throwApiError(401, 'Must be logged in');
   }
 
-  const listings = await listingRepository.findBySeller(sellerId);
-  // Include active and sold listings but not deleted
-  return wrapResponse(listings.filter((l) => l.status !== 'deleted'));
+  const { data, error } = await supabase
+    .from('listings')
+    .select(LISTING_SELECT)
+    .eq('seller_id', sellerId)
+    .neq('status', 'deleted')
+    .order('created_at', { ascending: false });
+
+  if (error) throwApiError(500, error.message);
+  return wrapResponse((data ?? []).map(toListing));
 }
 
-/**
- * Get all categories with their metadata.
- */
 export async function getCategories() {
   await simulateLatency(50, 100);
 
-  const categories = await categoryRepository.getAll();
-  if (categories.length > 0) {
-    return wrapResponse(normalizeAndSortCategories(categories));
+  const { data: categories, error } = await supabase
+    .from('categories')
+    .select('id, name, icon, count, listings')
+    .order('name', { ascending: true });
+
+  if (!error && categories && categories.length > 0) {
+    return wrapResponse(mergeWithDefaultCategories(categories as Category[]));
   }
 
-  // Self-heal when category table is empty: derive from active listings first.
-  const listings = await listingRepository.getAll();
-  const activeListings = listings.filter((listing) => listing.status === 'active');
+  const { data: activeRows, error: activeError } = await supabase
+    .from('listings')
+    .select('category')
+    .eq('status', 'active');
+
+  if (activeError) {
+    return wrapResponse(normalizeAndSortCategories(DEFAULT_CATEGORIES));
+  }
 
   const categoryCountMap = new Map<string, number>();
-  activeListings.forEach((listing) => {
-    const key = listing.category?.trim();
+  (activeRows ?? []).forEach((row: { category?: string }) => {
+    const key = row.category?.trim();
     if (!key) return;
     categoryCountMap.set(key, (categoryCountMap.get(key) ?? 0) + 1);
   });
@@ -364,75 +537,74 @@ export async function getCategories() {
     derivedCategories.length > 0 ? derivedCategories : DEFAULT_CATEGORIES,
   );
 
-  await Promise.all(
-    fallbackCategories.map(async (category) => {
-      await categoryRepository.create(category);
-    }),
-  );
-
-  const repairedCategories = await categoryRepository.getAll();
-  if (repairedCategories.length > 0) {
-    return wrapResponse(normalizeAndSortCategories(repairedCategories));
-  }
-
-  return wrapResponse(fallbackCategories);
+  return wrapResponse(mergeWithDefaultCategories(fallbackCategories));
 }
 
-// ─── Enriched queries (with seller data joined) ──────
-
-/** Listing with seller data joined for UI display */
 export interface EnrichedListing extends Listing {
-  seller?: Awaited<ReturnType<typeof userRepository.getById>>;
+  seller?: User | null;
 }
 
-/** Enrich a single listing with its seller data */
-async function enrichListing(listing: Listing): Promise<EnrichedListing> {
-  const seller = await userRepository.getById(listing.sellerId);
-  return { ...listing, seller };
+async function fetchSellersByIds(sellerIds: string[]): Promise<Map<string, User>> {
+  if (sellerIds.length === 0) return new Map();
+
+  const { data, error } = await supabase.from('users').select(SELLER_SELECT).in('id', sellerIds);
+  if (error || !data) return new Map();
+
+  const sellers = new Map<string, User>();
+  data.forEach((row) => {
+    const seller = toSeller(row);
+    sellers.set(seller.id, seller);
+  });
+  return sellers;
 }
 
-/**
- * Get all active listings enriched with seller info.
- * Used by pages that need to render ProductCard (which expects embedded seller).
- */
-export async function getAllEnriched(filters?: {
-  excludeSeller?: string;
-  category?: string;
-  limit?: number;
-}) {
+export async function getAllEnriched(filters?: { excludeSeller?: string; category?: string; limit?: number }) {
   await simulateLatency(80, 200);
 
-  let listings = await listingRepository.getAll();
-  listings = listings.filter((l) => l.status === 'active');
+  let query = supabase.from('listings').select(LISTING_SELECT).eq('status', 'active');
 
   if (filters?.excludeSeller) {
-    listings = listings.filter((l) => l.sellerId !== filters.excludeSeller);
+    query = query.neq('seller_id', filters.excludeSeller);
   }
   if (filters?.category) {
-    listings = listings.filter(
-      (l) => l.category.toLowerCase() === filters.category!.toLowerCase(),
-    );
-  }
-  if (filters?.limit) {
-    listings = listings.slice(0, filters.limit);
+    query = query.eq('category', filters.category);
   }
 
-  const enriched = await Promise.all(listings.map(enrichListing));
+  query = query.order('created_at', { ascending: false });
+
+  if (filters?.limit) {
+    query = query.limit(filters.limit);
+  }
+
+  const { data, error } = await query;
+  if (error) throwApiError(500, error.message);
+
+  const listings = (data ?? []).map(toListing);
+  const sellerIds = Array.from(new Set(listings.map((listing) => listing.sellerId)));
+  const sellers = await fetchSellersByIds(sellerIds);
+
+  const enriched: EnrichedListing[] = listings.map((listing) => ({
+    ...listing,
+    seller: sellers.get(listing.sellerId) ?? null,
+  }));
+
   return wrapResponse(enriched);
 }
 
-/**
- * Get a single listing enriched with seller info.
- */
 export async function getByIdEnriched(id: string) {
   await simulateLatency(50, 100);
 
-  const listing = await listingRepository.getById(id);
-  if (!listing) throwApiError(404, 'Listing not found');
+  const { data, error } = await supabase
+    .from('listings')
+    .select(LISTING_SELECT)
+    .eq('id', id)
+    .single();
 
-  // Increment views
-  await listingRepository.incrementViews(id);
+  if (error || !data) throwApiError(404, 'Listing not found');
 
-  const enriched = await enrichListing(listing);
-  return wrapResponse(enriched);
+  await supabase.rpc('increment_listing_views', { p_listing_id: id });
+
+  const listing = toListing(data);
+  const sellers = await fetchSellersByIds([listing.sellerId]);
+  return wrapResponse({ ...listing, seller: sellers.get(listing.sellerId) ?? null });
 }

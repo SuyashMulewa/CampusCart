@@ -14,7 +14,7 @@ export default defineConfig({
   },
   server: {
     allowedHosts: [
-      'train-mutual-brakes-precipitation.trycloudflare.com'
+      'beer-grateful-respondent-acer.trycloudflare.com'
     ]
   }
 });

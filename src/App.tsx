@@ -68,10 +68,16 @@ import { isUserFullyVerified } from '@/utils/profileVerification';
 
 // Protected Route Component — redirects to login if not authenticated
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const userId = localStorage.getItem('campuscart_current_user_id') || sessionStorage.getItem('campuscart_current_user_id');
-  if (!userId) {
+  const { data: user, isLoading } = useCurrentUser();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!user) {
     return <Navigate to="/login" replace />;
   }
+
   return <>{children}</>;
 }
 

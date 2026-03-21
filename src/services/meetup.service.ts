@@ -1,67 +1,96 @@
 /**
- * Meetup service — scheduling and confirming physical meetups.
- *
- * Simulates REST endpoints:
- *   POST   /meetups              → propose(dto)
- *   POST   /meetups/:id/confirm  → confirm(meetupId)
- *   GET    /meetups/order/:id    → getByOrder(orderId)
- *
- * When both parties confirm, the meetup locks and an OTP is generated.
+ * Meetup service — scheduling and confirming physical meetups (Supabase-backed).
  */
-import { meetupRepository } from '@/repositories/meetup.repository';
-import { orderRepository } from '@/repositories/order.repository';
 import { eventBus } from '@/events/eventBus';
 import { EVENTS } from '@/events/events';
+import { supabase } from '@/lib/supabase';
 import { getCurrentUserId } from './auth.service';
 import { confirm as confirmOrder } from './order.service';
 import { generate as generateOtp } from './otp.service';
 import { sendSystemMessage } from './chat.service';
 import type { Meetup, ProposeMeetupDTO } from '@/models/meetup.model';
-import { simulateLatency, wrapResponse, throwApiError, generateId, timestamp } from './base.service';
+import { simulateLatency, wrapResponse, throwApiError } from './base.service';
 
-/**
- * Propose meetup details for an order.
- * Creates a new meetup record and sends a meetup proposal message.
- *
- * @throws ApiError(401) if not authenticated
- * @throws ApiError(404) if order not found
- * @throws ApiError(400) if a meetup already exists for this order
- */
+const MEETUP_SELECT = `
+  id,
+  orderId:order_id,
+  conversationId:conversation_id,
+  location,
+  date,
+  time,
+  proposedBy:proposed_by,
+  buyerConfirmed:buyer_confirmed,
+  sellerConfirmed:seller_confirmed,
+  isLocked:is_locked,
+  status,
+  createdAt:created_at,
+  updatedAt:updated_at
+`;
+
+function toMeetup(row: any): Meetup {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    conversationId: row.conversationId,
+    location: row.location,
+    date: row.date,
+    time: typeof row.time === 'string' ? row.time.slice(0, 5) : row.time,
+    proposedBy: row.proposedBy,
+    buyerConfirmed: !!row.buyerConfirmed,
+    sellerConfirmed: !!row.sellerConfirmed,
+    isLocked: !!row.isLocked,
+    status: row.status,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
 export async function propose(dto: ProposeMeetupDTO) {
   await simulateLatency(100, 200);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const order = await orderRepository.getById(dto.orderId);
-  if (!order) throwApiError(404, 'Order not found');
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('id', dto.orderId)
+    .single();
 
-  // Check if meetup already exists
-  const existing = await meetupRepository.findByOrder(dto.orderId);
+  if (orderError || !order) throwApiError(404, 'Order not found');
+
+  const { data: existing } = await supabase
+    .from('meetups')
+    .select(MEETUP_SELECT)
+    .eq('order_id', dto.orderId)
+    .maybeSingle();
+
   if (existing && existing.status !== 'cancelled') {
-    // Update existing meetup instead of creating new
-    await meetupRepository.update(existing.id, {
-      location: dto.location,
-      date: dto.date,
-      time: dto.time,
-      proposedBy: userId,
-      // Sending details should not auto-confirm either party.
-      // Both buyer and seller must explicitly confirm in chat.
-      buyerConfirmed: false,
-      sellerConfirmed: false,
-      isLocked: false,
-      status: 'proposed',
-      updatedAt: timestamp(),
-    });
+    const { data: updatedRow, error: updateError } = await supabase
+      .from('meetups')
+      .update({
+        location: dto.location,
+        date: dto.date,
+        time: dto.time,
+        proposed_by: userId,
+        buyer_confirmed: false,
+        seller_confirmed: false,
+        is_locked: false,
+        status: 'proposed',
+      })
+      .eq('id', existing.id)
+      .select(MEETUP_SELECT)
+      .single();
 
-    const updated = await meetupRepository.getById(existing.id);
+    if (updateError || !updatedRow) {
+      throwApiError(500, updateError?.message || 'Failed to update meetup');
+    }
 
-    // Send meetup proposal message
     await sendSystemMessage(
       dto.conversationId,
       `📍 Meetup Details Updated\n📌 ${dto.location}\n📅 ${dto.date}\n⏰ ${dto.time}`,
       'meetup_proposal',
-      { location: dto.location, date: dto.date, time: dto.time, isMeetup: true }
+      { location: dto.location, date: dto.date, time: dto.time, isMeetup: true, proposedBy: userId, actorId: userId },
     );
 
     eventBus.emit(EVENTS.MEETUP_PROPOSED, {
@@ -70,77 +99,88 @@ export async function propose(dto: ProposeMeetupDTO) {
       conversationId: dto.conversationId,
     });
 
-    return wrapResponse(updated!);
+    return wrapResponse(toMeetup(updatedRow));
   }
 
-  const now = timestamp();
-  const meetup: Meetup = {
-    id: generateId('meet'),
-    orderId: dto.orderId,
-    conversationId: dto.conversationId,
-    location: dto.location,
-    date: dto.date,
-    time: dto.time,
-    proposedBy: userId,
-    // Sending meetup details does not count as confirmation.
-    buyerConfirmed: false,
-    sellerConfirmed: false,
-    isLocked: false,
-    status: 'proposed',
-    createdAt: now,
-    updatedAt: now,
-  };
+  const { data: createdRow, error: createError } = await supabase
+    .from('meetups')
+    .insert({
+      order_id: dto.orderId,
+      conversation_id: dto.conversationId,
+      location: dto.location,
+      date: dto.date,
+      time: dto.time,
+      proposed_by: userId,
+      buyer_confirmed: false,
+      seller_confirmed: false,
+      is_locked: false,
+      status: 'proposed',
+    })
+    .select(MEETUP_SELECT)
+    .single();
 
-  await meetupRepository.create(meetup);
+  if (createError || !createdRow) {
+    throwApiError(500, createError?.message || 'Failed to create meetup');
+  }
 
-  // Send meetup proposal message
   await sendSystemMessage(
     dto.conversationId,
     `📍 Meetup Details\n📌 ${dto.location}\n📅 ${dto.date}\n⏰ ${dto.time}`,
     'meetup_proposal',
-    { location: dto.location, date: dto.date, time: dto.time, isMeetup: true }
+    { location: dto.location, date: dto.date, time: dto.time, isMeetup: true, proposedBy: userId, actorId: userId },
   );
 
   eventBus.emit(EVENTS.MEETUP_PROPOSED, {
-    meetupId: meetup.id,
+    meetupId: createdRow.id,
     orderId: dto.orderId,
     conversationId: dto.conversationId,
   });
 
-  return wrapResponse(meetup);
+  return wrapResponse(toMeetup(createdRow));
 }
 
-/**
- * Confirm the meetup from the current user's perspective.
- * If both parties have confirmed, the meetup locks and OTP is generated.
- *
- * @throws ApiError(401) if not authenticated
- * @throws ApiError(404) if meetup not found
- */
 export async function confirm(meetupId: string) {
   await simulateLatency(100, 200);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const meetup = await meetupRepository.getById(meetupId);
-  if (!meetup) throwApiError(404, 'Meetup not found');
+  const { data: currentMeetup, error: meetupError } = await supabase
+    .from('meetups')
+    .select(MEETUP_SELECT)
+    .eq('id', meetupId)
+    .single();
 
-  const order = await orderRepository.getById(meetup.orderId);
-  if (!order) throwApiError(404, 'Associated order not found');
+  if (meetupError || !currentMeetup) throwApiError(404, 'Meetup not found');
 
-  // Determine role
-  const role = order.buyerId === userId ? 'buyer' : 'seller';
+  const meetup = toMeetup(currentMeetup);
 
-  // Confirm
-  const updated = await meetupRepository.confirmByUser(meetupId, role);
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, buyer_id, seller_id')
+    .eq('id', meetup.orderId)
+    .single();
 
-  // Send confirmation message
+  if (orderError || !order) throwApiError(404, 'Associated order not found');
+
+  const role = order.buyer_id === userId ? 'buyer' : 'seller';
+
+  const { data: updatedRows, error: confirmError } = await supabase.rpc('confirm_meetup_by_user', {
+    p_meetup_id: meetupId,
+    p_user_id: userId,
+  });
+
+  if (confirmError || !updatedRows || !Array.isArray(updatedRows) || updatedRows.length === 0) {
+    throwApiError(400, confirmError?.message || 'Could not confirm meetup');
+  }
+
+  const updated = toMeetup(updatedRows[0]);
+
   await sendSystemMessage(
     meetup.conversationId,
     `✅ ${role === 'buyer' ? 'Buyer' : 'Seller'} confirmed the meetup!`,
     'system',
-    { actorId: userId }
+    { actorId: userId },
   );
 
   eventBus.emit(EVENTS.MEETUP_CONFIRMED, {
@@ -149,12 +189,8 @@ export async function confirm(meetupId: string) {
     conversationId: meetup.conversationId,
   });
 
-  // If both confirmed → lock meetup, confirm order, generate OTP
   if (updated.isLocked) {
-    // Confirm the order (pending → confirmed)
     await confirmOrder(meetup.orderId);
-
-    // Generate OTP for verification
     await generateOtp(meetupId, meetup.orderId);
 
     eventBus.emit(EVENTS.MEETUP_LOCKED, {
@@ -167,12 +203,15 @@ export async function confirm(meetupId: string) {
   return wrapResponse(updated);
 }
 
-/**
- * Get the meetup details for a specific order.
- */
 export async function getByOrder(orderId: string) {
   await simulateLatency(50, 100);
 
-  const meetup = await meetupRepository.findByOrder(orderId);
-  return wrapResponse(meetup ?? null);
+  const { data, error } = await supabase
+    .from('meetups')
+    .select(MEETUP_SELECT)
+    .eq('order_id', orderId)
+    .maybeSingle();
+
+  if (error) throwApiError(500, error.message);
+  return wrapResponse(data ? toMeetup(data) : null);
 }

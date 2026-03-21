@@ -9,6 +9,7 @@ import { Eye, EyeOff, Mail, Lock, ArrowRight, BookOpen, GraduationCap, Pencil } 
 import { styledToast } from '@/utils/styledToast';
 import { useLogin } from '@/state';
 import { validateEmail } from '@/utils/validation';
+import { resendVerificationEmail } from '@/services/auth.service';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -18,10 +19,13 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [resendPending, setResendPending] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNeedsEmailVerification(false);
 
     // Validate email format
     const emailError = validateEmail(email);
@@ -37,7 +41,29 @@ export default function LoginPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Something went wrong. Please try again.';
       setError(message);
+      setNeedsEmailVerification(message.toLowerCase().includes('email not verified'));
       styledToast.error('Login Failed', message);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const emailError = validateEmail(normalizedEmail);
+    if (emailError) {
+      setError(emailError);
+      return;
+    }
+
+    try {
+      setResendPending(true);
+      await resendVerificationEmail(normalizedEmail);
+      styledToast.success('Verification email sent', 'Please check your inbox and spam folder.');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not resend verification email.';
+      styledToast.error('Resend failed', message);
+    } finally {
+      setResendPending(false);
     }
   };
 
@@ -192,6 +218,17 @@ export default function LoginPage() {
               >
                 {error}
               </motion.div>
+            )}
+
+            {needsEmailVerification && (
+              <button
+                type="button"
+                onClick={handleResendVerification}
+                disabled={resendPending || isLoading}
+                className="w-full py-3 border border-[#F5B800] text-[#B88600] rounded-xl font-medium hover:bg-[#FFF7D6] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {resendPending ? 'Sending verification email...' : 'Resend verification email'}
+              </button>
             )}
 
             {/* Submit Button */}

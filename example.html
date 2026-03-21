@@ -1,189 +1,160 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
-    <meta charset="utf-8" />
-    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Profile Settings - Campus Cart</title>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"
-        rel="stylesheet" />
-    <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
-        rel="stylesheet" />
-    <script>
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     colors: {
-                        primary: "#1e40af",
-                        "campus-yellow": "#facc15",
-                        "background-light": "#f9fafb",
-                        "background-dark": "#111827",
+                        "primary": "#ebb50b",
+                        "secondary": "#71b55a",
+                        "background-light": "#ffffff",
+                        "background-dark": "#000000",
                     },
                     fontFamily: {
-                        display: ["Inter", "sans-serif"],
+                        "display": ["Inter"]
                     },
-                    borderRadius: {
-                        DEFAULT: "0.5rem",
-                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
                 },
             },
-        };
+        }
     </script>
-    <style type="text/tailwindcss">
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .section-label {
-            @apply text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 block capitalize;
-        }
-        .sketch-card {
-            @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-6;
-        }
-        .input-field {
-            @apply w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg focus:ring-2 focus:ring-campus-yellow focus:border-transparent outline-none transition-all dark:text-white;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-    </style>
+<title>Student Profile Portal</title>
 </head>
-
-<body class="bg-slate-50 dark:bg-background-dark min-h-screen transition-colors duration-200">
-    <div class="bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30 px-4 py-3">
-        <div class="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div
-                    class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-800/40 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-red-600 dark:text-red-400 text-xl">priority_high</span>
-                </div>
-                <div>
-                    <p class="text-sm font-semibold text-red-900 dark:text-red-100">Your profile is only 60% complete!
-                    </p>
-                    <p class="text-xs text-red-700 dark:text-red-300">Finish verification to unlock all features and
-                        start selling.</p>
-                </div>
-            </div>
-            <button
-                class="bg-red-600 hover:bg-red-700 text-white text-sm font-bold px-6 py-2 rounded-lg transition-colors shadow-sm whitespace-nowrap">
-                Complete Now
-            </button>
-        </div>
-    </div>
-    <main class="py-8 px-4">
-        <div class="max-w-4xl mx-auto">
-            <h1 class="text-2xl font-bold text-slate-900 dark:text-white mb-8">Profile Settings</h1>
-            <section class="sketch-card">
-                <div class="flex items-center justify-between mb-8">
-                    <h2 class="text-lg font-bold text-slate-900 dark:text-white">Profile</h2>
-                </div>
-                <div class="flex flex-col items-center mb-8">
-                    <div class="relative group">
-                        <div
-                            class="w-32 h-32 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center border-4 border-white dark:border-slate-800 shadow-md overflow-hidden">
-                            <span class="material-symbols-outlined text-6xl text-slate-400">person</span>
-                        </div>
-                        <button
-                            class="absolute bottom-1 right-1 bg-white dark:bg-slate-700 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-600">
-                            <span
-                                class="material-symbols-outlined text-lg text-slate-600 dark:text-slate-300">add_a_photo</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="space-y-6">
-                    <div>
-                        <label class="section-label" for="name">Name</label>
-                        <input class="input-field" id="name" placeholder="Full Name" type="text" value="Rahul Sharma" />
-                    </div>
-                    <div>
-                        <label class="section-label" for="campus">Campus</label>
-                        <input class="input-field" id="campus" placeholder="Your University/College Name" type="text"
-                            value="Indian Institute of Technology, Delhi" />
-                    </div>
-                    <div>
-                        <label class="section-label" for="bio">Bio</label>
-                        <textarea class="input-field resize-none" id="bio" placeholder="Tell us about yourself..."
-                            rows="3">CS student passionate about tech and sustainability. Always looking to buy/sell course materials.</textarea>
-                    </div>
-                </div>
-            </section>
-            <section class="sketch-card">
-                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-6">Contact Info</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label class="section-label" for="email">Email (College)</label>
-                        <input class="input-field" id="email" placeholder="college-email@edu.com" type="email"
-                            value="rahul.s@campus.edu" />
-                    </div>
-                    <div>
-                        <label class="section-label" for="phone">Phone No.</label>
-                        <input class="input-field" id="phone" placeholder="+91 XXXXX XXXXX" type="tel"
-                            value="+91 98765 43210" />
-                    </div>
-                </div>
-            </section>
-            <section class="sketch-card">
-                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-6">Verification</h2>
-                <div class="space-y-6">
-                    <div>
-                        <label class="section-label">Upload ID Card</label>
-                        <div
-                            class="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-10 flex flex-col items-center justify-center bg-slate-50/50 dark:bg-slate-800/30 hover:border-campus-yellow transition-colors cursor-pointer group">
-                            <div
-                                class="w-12 h-12 bg-white dark:bg-slate-700 rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform">
-                                <span
-                                    class="material-symbols-outlined text-slate-400 group-hover:text-campus-yellow">upload</span>
-                            </div>
-                            <p class="text-sm font-semibold text-slate-900 dark:text-white text-center">Upload Photo
-                                with ID card in camera frame</p>
-                            <p class="text-xs text-slate-500 mt-2">PNG, JPG up to 5MB</p>
-                        </div>
-                    </div>
-                    <div>
-                        <label class="section-label" for="enr-no">Enr no.</label>
-                        <input class="input-field" id="enr-no" placeholder="e.g. 2021CSB10XX" type="text" />
-                    </div>
-                    <div>
-                        <label class="section-label" for="abc-id">ABC ID</label>
-                        <input class="input-field" id="abc-id" placeholder="12-digit Academic Bank of Credits ID"
-                            type="text" />
-                    </div>
-                </div>
-            </section>
-            <section class="sketch-card">
-                <h2 class="text-lg font-bold text-slate-900 dark:text-white mb-6">Social Link</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="section-label" for="facebook">Facebook</label>
-                        <input class="input-field text-sm" id="facebook" placeholder="facebook.com/username"
-                            type="text" />
-                    </div>
-                    <div>
-                        <label class="section-label" for="instagram">Instagram</label>
-                        <input class="input-field text-sm" id="instagram" placeholder="instagram.com/username"
-                            type="text" />
-                    </div>
-                    <div>
-                        <label class="section-label" for="linkedin">Linkedin</label>
-                        <input class="input-field text-sm" id="linkedin" placeholder="linkedin.com/in/username"
-                            type="text" />
-                    </div>
-                </div>
-            </section>
-            <div class="flex gap-4 mb-10">
-                <button
-                    class="flex-1 py-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors shadow-sm">
-                    Cancel
-                </button>
-                <button
-                    class="flex-1 py-4 bg-campus-yellow text-slate-900 font-bold rounded-xl hover:bg-yellow-500 transition-all shadow-md">
-                    Save
-                </button>
-            </div>
-        </div>
-    </main>
-</body>
-
-</html>
+<body class="bg-background-light text-black font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<main class="px-4 md:px-20 lg:px-40 flex flex-1 justify-center py-6">
+<div class="layout-content-container flex flex-col max-w-[960px] flex-1 gap-6">
+<!-- Verification Progress Section -->
+<div class="bg-slate-50 border border-slate-100 rounded-xl p-5 flex flex-col gap-4">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="size-10 rounded-full bg-white flex items-center justify-center text-red-500 shadow-sm">
+<span class="material-symbols-outlined" style="">warning</span>
+</div>
+<div class="flex flex-col">
+<h3 class="text-black font-bold" style="">Verification status:</h3>
+<p class="text-black text-sm opacity-70" style="">Complete all required fields and verification to unlock all platform features.</p>
+</div>
+</div>
+<span class="text-black text-lg font-bold" style="">20%</span>
+</div>
+<div class="w-full bg-white rounded-full h-2 overflow-hidden shadow-inner">
+<div class="bg-primary h-full rounded-full" style="width: 20%"></div>
+</div>
+</div>
+<!-- Profile Header Section -->
+<div class="bg-white rounded-xl p-14 shadow-sm border border-slate-100">
+<div class="flex flex-col md:flex-row items-center gap-8">
+<div class="relative">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-48 w-48 border-4 border-primary ring-4 ring-primary/10" data-alt="Student profile picture featuring Alex Johnson" style="background-image: url(&quot;https://lh3.googleusercontent.com/aida-public/AB6AXuDQ56rhEXY9jPZtQMxNOnNOCAngdZf_061GLFoJ-2ghUld_RhE9D2g87-MWPT8JHuM24MM6yH_DwW4tVrlNMUhFJr1x9R9b2GPzY4H5BEzelLeZgEHzV_tre04gMsuFlLA7VAbKVaBMSE6iX-k2wsjzfm_ntAwZMEUm0kvibi3Z2ing63oN205S62BKQCsRkLgWkfWGLRBu6mdyzGtkGDWr4u92QImym0V7p3v_jUIaWrcanMcUNRzCepERmIA5mdbeNys7v7ijd_bq&quot;);"></div>
+<div class="absolute bottom-1 right-1 bg-secondary border-2 border-white rounded-full h-5 w-5"></div>
+</div>
+<div class="flex flex-col items-center md:items-start flex-1 text-center md:text-left">
+<div class="flex flex-wrap items-center justify-center md:justify-start gap-3 mb-2">
+<h1 class="text-black text-3xl font-bold leading-tight tracking-[-0.015em]" style="">Alex Johnson</h1>
+<span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-secondary text-white text-xs font-bold uppercase tracking-wider" style=""></span>
+</div>
+<p class="text-black opacity-80 text-lg font-medium" style=""><span class="material-symbols-outlined text-primary text-xl align-bottom mr-2" style="">school</span>University of Academic Excellence</p>
+<p class="text-black opacity-70 text-base mt-2" style="">Hi, I am a 3rd year Student specializing in Computer Science and Design Innovation.</p>
+<div class="flex gap-3 mt-6">
+<button class="bg-primary hover:bg-[#d4a30a] text-black font-bold py-2 px-6 rounded-lg transition-all shadow-md" style="">Edit Profile</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Verification Required Alert Box -->
+<div class="bg-red-50 border border-red-100 rounded-xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+<span class="material-symbols-outlined" style="">error</span>
+</div>
+<div class="flex flex-col">
+<h3 class="text-black font-bold text-lg" style="">Verification required</h3>
+<p class="text-black opacity-70 text-sm" style="">Complete the form below to unlock all features.</p>
+</div>
+</div>
+<button class="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-6 rounded-lg transition-all shadow-sm" style="">
+                        Verify Yourself
+                    </button>
+</div>
+<!-- Contact & Social Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- Contact Information -->
+<div class="flex flex-col gap-5 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+<h2 class="text-black text-xl font-bold flex items-center gap-2" style="">
+                            Contact Information
+                        </h2>
+<div class="space-y-4">
+<div class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 transition-colors group">
+<div class="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
+<span class="material-symbols-outlined" style="">mail</span>
+</div>
+<div>
+<p class="text-xs font-semibold text-slate-400 uppercase tracking-wider" style="">Email Address</p>
+<p class="text-black font-medium" style="">alex.johnson@university.edu</p>
+</div>
+</div>
+<div class="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 transition-colors group">
+<div class="size-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-black transition-all">
+<span class="material-symbols-outlined" style="">call</span>
+</div>
+<div>
+<p class="text-xs font-semibold text-slate-400 uppercase tracking-wider" style="">Mobile Number</p>
+<p class="text-black font-medium" style="">(+91)-76xxxxxx98</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Social Links -->
+<div class="flex flex-col gap-5 bg-white p-6 rounded-xl border border-slate-100 shadow-sm">
+<h2 class="text-black text-xl font-bold flex items-center gap-2" style="">
+                            Social Presence
+                        </h2>
+<div class="grid grid-cols-1 gap-3">
+<a class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary hover:bg-primary/5 transition-all group" href="#" style="">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors" style="">Likedin icon</span>
+<span class="font-medium text-black" style="">LinkedIn</span>
+</div>
+<span class="text-slate-400 text-sm" style="">linkedin.com/in/alexj</span>
+</a>
+<a class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary hover:bg-primary/5 transition-all group" href="#" style="">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors" style="">instagram icon</span>
+<span class="font-medium text-black" style="">Instagram</span>
+</div>
+<span class="text-slate-400 text-sm" style="">@alex.academic</span>
+</a>
+<a class="flex items-center justify-between p-3 rounded-lg border border-slate-100 hover:border-primary hover:bg-primary/5 transition-all group" href="#" style="">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-slate-400 group-hover:text-primary transition-colors" style="">facebook icon</span>
+<span class="font-medium text-black" style="">Facebook</span>
+</div>
+<span class="text-slate-400 text-sm" style="">fb.com/alexjohnson</span>
+</a>
+</div>
+</div>
+</div>
+<!-- Quick Cards so for here ADD the details using your mind what should be included on a profile page in accordance with our project needs-->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<div class="bg-white p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center shadow-sm">
+</div>
+<div class="bg-white p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center shadow-sm">
+</div>
+<div class="bg-white p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center shadow-sm">
+</div>
+<div class="bg-white p-4 rounded-xl border border-slate-100 flex flex-col items-center text-center shadow-sm">
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

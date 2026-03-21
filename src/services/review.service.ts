@@ -1,63 +1,92 @@
 /**
- * Review service — submitting and querying post-transaction reviews.
- *
- * Simulates REST endpoints:
- *   POST   /reviews                → submit(dto)
- *   GET    /reviews/user/:id       → getForUser(userId)
- *   GET    /reviews/order/:id      → getForOrder(orderId)
+ * Review service — submitting and querying post-transaction reviews (Supabase-backed).
  */
-import { reviewRepository } from '@/repositories/review.repository';
-import { userRepository } from '@/repositories/user.repository';
-import { orderRepository } from '@/repositories/order.repository';
 import { eventBus } from '@/events/eventBus';
 import { EVENTS } from '@/events/events';
+import { supabase } from '@/lib/supabase';
 import { getCurrentUserId } from './auth.service';
 import type { Review, CreateReviewDTO } from '@/models/review.model';
-import { simulateLatency, wrapResponse, throwApiError, generateId, timestamp } from './base.service';
+import { simulateLatency, wrapResponse, throwApiError } from './base.service';
 
-/**
- * Submit a review for a completed order.
- *
- * @throws ApiError(401) if not authenticated
- * @throws ApiError(404) if order not found
- * @throws ApiError(400) if order is not completed
- * @throws ApiError(400) if user already reviewed this order
- */
+const REVIEW_SELECT = `
+  id,
+  orderId:order_id,
+  reviewerId:reviewer_id,
+  revieweeId:reviewee_id,
+  rating,
+  comment,
+  createdAt:created_at
+`;
+
+function toReview(row: any): Review {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    reviewerId: row.reviewerId,
+    revieweeId: row.revieweeId,
+    rating: typeof row.rating === 'number' ? row.rating : Number(row.rating),
+    comment: row.comment ?? undefined,
+    createdAt: row.createdAt,
+  };
+}
+
 export async function submit(dto: CreateReviewDTO) {
   await simulateLatency(100, 200);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const order = await orderRepository.getById(dto.orderId);
-  if (!order) throwApiError(404, 'Order not found');
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, status, buyer_id, seller_id')
+    .eq('id', dto.orderId)
+    .single();
 
+  if (orderError || !order) throwApiError(404, 'Order not found');
   if (order.status !== 'completed') {
     throwApiError(400, 'Can only review completed orders');
   }
+  if (userId !== order.buyer_id && userId !== order.seller_id) {
+    throwApiError(403, 'You can only review orders you participated in');
+  }
+  if (dto.revieweeId !== order.buyer_id && dto.revieweeId !== order.seller_id) {
+    throwApiError(400, 'Reviewee must be part of the order');
+  }
+  if (dto.revieweeId === userId) {
+    throwApiError(400, 'You cannot review yourself');
+  }
 
-  // Check if already reviewed
-  const alreadyReviewed = await reviewRepository.findByOrder(dto.orderId, userId);
+  const { data: alreadyReviewed } = await supabase
+    .from('reviews')
+    .select('id')
+    .eq('order_id', dto.orderId)
+    .eq('reviewer_id', userId)
+    .maybeSingle();
+
   if (alreadyReviewed) {
     throwApiError(400, 'You have already reviewed this order');
   }
 
-  const now = timestamp();
-  const review: Review = {
-    id: generateId('rev'),
-    orderId: dto.orderId,
-    reviewerId: userId,
-    revieweeId: dto.revieweeId,
-    rating: dto.rating,
-    comment: dto.comment ?? '',
-    createdAt: now,
-  };
+  const { data, error } = await supabase
+    .from('reviews')
+    .insert({
+      order_id: dto.orderId,
+      reviewer_id: userId,
+      reviewee_id: dto.revieweeId,
+      rating: dto.rating,
+      comment: dto.comment ?? null,
+    })
+    .select(REVIEW_SELECT)
+    .single();
 
-  await reviewRepository.create(review);
+  if (error || !data) {
+    if (error?.code === '23505') {
+      throwApiError(400, 'You have already reviewed this order');
+    }
+    throwApiError(500, error?.message || 'Failed to submit review');
+  }
 
-  // Update reviewee's average rating
-  const ratingStats = await reviewRepository.getAverageRating(dto.revieweeId);
-  await userRepository.updateRating(dto.revieweeId, ratingStats.average, ratingStats.count);
+  const review = toReview(data);
 
   eventBus.emit(EVENTS.REVIEW_SUBMITTED, {
     reviewId: review.id,
@@ -68,22 +97,28 @@ export async function submit(dto: CreateReviewDTO) {
   return wrapResponse(review);
 }
 
-/**
- * Get all reviews for a specific user (as reviewee).
- */
 export async function getForUser(userId: string) {
   await simulateLatency(50, 100);
 
-  const reviews = await reviewRepository.findByReviewee(userId);
-  return wrapResponse(reviews);
+  const { data, error } = await supabase
+    .from('reviews')
+    .select(REVIEW_SELECT)
+    .eq('reviewee_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) throwApiError(500, error.message);
+  return wrapResponse((data ?? []).map(toReview));
 }
 
-/**
- * Get reviews for a specific order.
- */
 export async function getForOrder(orderId: string) {
   await simulateLatency(50, 100);
 
-  const reviews = await reviewRepository.findByOrder(orderId);
-  return wrapResponse(reviews);
+  const { data, error } = await supabase
+    .from('reviews')
+    .select(REVIEW_SELECT)
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: false });
+
+  if (error) throwApiError(500, error.message);
+  return wrapResponse((data ?? []).map(toReview));
 }

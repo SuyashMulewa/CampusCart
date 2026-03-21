@@ -15,8 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import UserSidebar from '@/components/UserSidebar';
-import { useCategories, useCurrentUser, useDeleteListing, useListingsAsProducts } from '@/state';
-import type { Product } from '@/data/mockData';
+import { useCategories, useCurrentUser, useDeleteListing, useMyListings } from '@/state';
 import { styledToast } from '@/utils/styledToast';
 import { isUserFullyVerified } from '@/utils/profileVerification';
 
@@ -31,11 +30,7 @@ export default function ListingsPage() {
   const [activeTab, setActiveTab] = useState('Pending');
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const { data: allProducts = [] } = useListingsAsProducts();
-  // Filter to show current user's listings (match by seller.id with sessionStorage user)
-  const currentUserId = sessionStorage.getItem('campuscart_current_user_id') ?? '';
-  const myProducts = allProducts.filter((p: Product) => p.seller.id === currentUserId);
-  const listings = myProducts;
+  const { data: listings = [] } = useMyListings();
 
   const normalizedStatus = (status?: string) => (status || 'active').toLowerCase();
   const filteredListings = useMemo(() => {

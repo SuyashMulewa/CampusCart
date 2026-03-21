@@ -86,6 +86,7 @@ export default function CreateListingPage() {
     maxNegotiationLimit: editingListing?.price?.toString() || '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const selectedCategoryName = useMemo(() => {
     const category = categories.find((cat) => cat.id === formData.category || cat.name === formData.category);
@@ -151,9 +152,25 @@ export default function CreateListingPage() {
     const files = e.target.files;
     if (files) {
       Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) {
+          styledToast.error('Invalid file', 'Only image files are allowed.');
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          styledToast.error('File too large', 'Each image must be 5MB or less.');
+          return;
+        }
+        if (images.length >= 8) {
+          styledToast.error('Image limit reached', 'You can upload up to 8 images.');
+          return;
+        }
         const reader = new FileReader();
         reader.onloadend = () => {
-          setImages(prev => [...prev, reader.result as string]);
+          setImages(prev => {
+            if (prev.length >= 8) return prev;
+            return [...prev, reader.result as string];
+          });
+          setFieldErrors((prev) => ({ ...prev, images: '' }));
         };
         reader.readAsDataURL(file);
       });
@@ -166,6 +183,46 @@ export default function CreateListingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const nextErrors: Record<string, string> = {};
+    const trimmedTitle = formData.title.trim();
+    const trimmedDescription = formData.description.trim();
+    const price = Number(formData.price);
+    const mrp = Number(formData.mrp);
+    const negotiableLimit = Number(formData.maxNegotiationLimit);
+
+    if (images.length === 0) {
+      nextErrors.images = 'Upload at least 1 product image';
+    }
+    if (trimmedTitle.length < 5 || trimmedTitle.length > 120) {
+      nextErrors.title = 'Title must be 5 to 120 characters';
+    }
+    if (!formData.category) {
+      nextErrors.category = 'Please select a category';
+    }
+    if (trimmedDescription.length < 20 || trimmedDescription.length > 1000) {
+      nextErrors.description = 'Description must be 20 to 1000 characters';
+    }
+    if (!Number.isFinite(price) || price <= 0) {
+      nextErrors.price = 'Price must be greater than 0';
+    }
+    if (!Number.isFinite(mrp) || mrp <= 0) {
+      nextErrors.mrp = 'MRP must be greater than 0';
+    } else if (Number.isFinite(price) && mrp < price) {
+      nextErrors.mrp = 'MRP must be greater than or equal to price';
+    }
+    if (!Number.isFinite(negotiableLimit) || negotiableLimit <= 0) {
+      nextErrors.maxNegotiationLimit = 'Negotiable limit must be greater than 0';
+    } else if (Number.isFinite(price) && negotiableLimit > price) {
+      nextErrors.maxNegotiationLimit = 'Negotiable limit cannot exceed selling price';
+    }
+
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) {
+      styledToast.error('Invalid listing details', Object.values(nextErrors)[0]);
+      return;
+    }
+
     setIsSubmitting(true);
     const conditionMap: Record<string, ListingCondition> = {
       new: 'New',
@@ -173,16 +230,16 @@ export default function CreateListingPage() {
       fair: 'Fair',
     };
     try {
-      const price = Number(formData.price) || 0;
-      const mrp = Number(formData.mrp) || price;
+      const safePrice = Number(formData.price) || 0;
+      const safeMrp = Number(formData.mrp) || safePrice;
       const parsedLimit = Number(formData.maxNegotiationLimit);
-      const negotiableMinPrice = Number.isNaN(parsedLimit) ? price : Math.min(parsedLimit, price);
+      const negotiableMinPrice = Number.isNaN(parsedLimit) ? safePrice : Math.min(parsedLimit, safePrice);
       const dateOfPurchase = formData.purchaseAge;
       const payload = {
-        title: formData.title,
-        description: formData.description || formData.title,
-        price,
-        mrp,
+        title: trimmedTitle,
+        description: trimmedDescription,
+        price: safePrice,
+        mrp: safeMrp,
         negotiableMinPrice,
         category: formData.category,
         condition: conditionMap[formData.condition] || 'Good',
@@ -194,15 +251,15 @@ export default function CreateListingPage() {
       };
       if (editId) {
         await updateListingMutation.mutateAsync({ id: editId, dto: payload });
-        window.alert('Listing details saved.');
+        styledToast.success('Listing updated', 'Listing details were saved.');
       } else {
         await createListingMutation.mutateAsync(payload);
-        window.alert('Your item is listed.');
+        styledToast.success('Listing published', 'Your item is now live.');
       }
       navigate('/listings');
     } catch (err) {
       console.error('Failed to save listing:', err);
-      window.alert('Failed to save listing. Please try again.');
+      styledToast.error('Save failed', 'Failed to save listing. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -269,6 +326,7 @@ export default function CreateListingPage() {
                   className="hidden"
                 />
               </div>
+              {fieldErrors.images && <p className="mt-2 text-xs text-red-500">{fieldErrors.images}</p>}
               <div className="mt-4 bg-amber-50 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <Lightbulb className="w-5 h-5 text-amber-600 mt-0.5" />
@@ -296,18 +354,29 @@ export default function CreateListingPage() {
                   <input
                     type="text"
                     value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, title: e.target.value });
+                      setFieldErrors((prev) => ({ ...prev, title: '' }));
+                    }}
                     placeholder="e.g. brand, product name, model ..."
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none"
+                    className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none ${
+                      fieldErrors.title ? 'border-red-300' : 'border-gray-200'
+                    }`}
                     required
                   />
+                  {fieldErrors.title && <p className="mt-1 text-xs text-red-500">{fieldErrors.title}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
                   <select
                     value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none"
+                    onChange={(e) => {
+                      setFormData({ ...formData, category: e.target.value });
+                      setFieldErrors((prev) => ({ ...prev, category: '' }));
+                    }}
+                    className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none ${
+                      fieldErrors.category ? 'border-red-300' : 'border-gray-200'
+                    }`}
                     required
                   >
                     <option value="" disabled hidden>Select a Category for your product</option>
@@ -315,16 +384,23 @@ export default function CreateListingPage() {
                       <option key={cat.id} value={cat.id}>{cat.name}</option>
                     ))}
                   </select>
+                  {fieldErrors.category && <p className="mt-1 text-xs text-red-500">{fieldErrors.category}</p>}
                 </div>
                 <div className="mb-4 col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
                 <textarea
                   value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, description: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, description: '' }));
+                  }}
                   placeholder="Describe the item's condition, features, and any included accessories..."
                   rows={4}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none resize-none"
+                  className={`w-full px-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none resize-none ${
+                    fieldErrors.description ? 'border-red-300' : 'border-gray-200'
+                  }`}
                 />
+                {fieldErrors.description && <p className="mt-1 text-xs text-red-500">{fieldErrors.description}</p>}
               </div>
               </div>
             </motion.div>
@@ -392,12 +468,18 @@ export default function CreateListingPage() {
                     <input
                       type="number"
                       value={formData.price}
-                      onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, price: e.target.value });
+                        setFieldErrors((prev) => ({ ...prev, price: '' }));
+                      }}
                       placeholder="0.00"
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none"
+                      className={`w-full pl-10 pr-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none ${
+                        fieldErrors.price ? 'border-red-300' : 'border-gray-200'
+                      }`}
                       required
                     />
                   </div>
+                  {fieldErrors.price && <p className="mt-1 text-xs text-red-500">{fieldErrors.price}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">MRP / Original Price (₹)</label>
@@ -406,12 +488,18 @@ export default function CreateListingPage() {
                     <input
                       type="number"
                       value={formData.mrp}
-                      onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
+                      onChange={(e) => {
+                        setFormData({ ...formData, mrp: e.target.value });
+                        setFieldErrors((prev) => ({ ...prev, mrp: '' }));
+                      }}
                       placeholder="0.00"
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none"
+                      className={`w-full pl-10 pr-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none ${
+                        fieldErrors.mrp ? 'border-red-300' : 'border-gray-200'
+                      }`}
                       required
                     />
                   </div>
+                  {fieldErrors.mrp && <p className="mt-1 text-xs text-red-500">{fieldErrors.mrp}</p>}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">PRICE Negotiable Upto (₹)</label>
@@ -429,12 +517,16 @@ export default function CreateListingPage() {
                           ? ''
                           : String(maxPrice > 0 ? Math.min(numericValue, maxPrice) : numericValue);
                         setFormData({ ...formData, maxNegotiationLimit: inputValue === '' ? '' : nextValue });
+                        setFieldErrors((prev) => ({ ...prev, maxNegotiationLimit: '' }));
                       }}
                       placeholder="0.00"
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none"
+                      className={`w-full pl-10 pr-4 py-3 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-[#F5B800]/30 focus:border-[#F5B800] outline-none ${
+                        fieldErrors.maxNegotiationLimit ? 'border-red-300' : 'border-gray-200'
+                      }`}
                       required
                     />
                   </div>
+                  {fieldErrors.maxNegotiationLimit && <p className="mt-1 text-xs text-red-500">{fieldErrors.maxNegotiationLimit}</p>}
                 </div>
               </div>
             </motion.div>

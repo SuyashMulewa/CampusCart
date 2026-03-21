@@ -1,125 +1,153 @@
 /**
- * Notification service — CRUD for user notifications.
- *
- * Simulates REST endpoints:
- *   GET    /notifications             → getAll()
- *   PUT    /notifications/:id/read    → markAsRead(id)
- *   PUT    /notifications/read-all    → markAllAsRead()
- *   POST   /notifications             → create(dto) — internal
+ * Notification service — CRUD for user notifications (Supabase-backed).
  */
-import { notificationRepository } from '@/repositories/notification.repository';
 import { eventBus } from '@/events/eventBus';
 import { EVENTS } from '@/events/events';
+import { supabase } from '@/lib/supabase';
 import { getCurrentUserId } from './auth.service';
 import type { Notification, CreateNotificationDTO } from '@/models/notification.model';
-import { simulateLatency, wrapResponse, throwApiError, generateId, timestamp } from './base.service';
+import { simulateLatency, wrapResponse, throwApiError } from './base.service';
 
-/**
- * Get all notifications for the current user, ordered by creation date (newest first).
- *
- * @throws ApiError(401) if not authenticated
- */
+const NOTIFICATION_SELECT = `
+  id,
+  userId:user_id,
+  type,
+  title,
+  content,
+  link,
+  relatedEntityId:related_entity_id,
+  relatedEntityType:related_entity_type,
+  isRead:is_read,
+  createdAt:created_at
+`;
+
+function toNotification(row: any): Notification {
+  return {
+    id: row.id,
+    userId: row.userId,
+    type: row.type,
+    title: row.title,
+    content: row.content,
+    link: row.link ?? undefined,
+    relatedEntityId: row.relatedEntityId ?? undefined,
+    relatedEntityType: row.relatedEntityType ?? undefined,
+    isRead: !!row.isRead,
+    createdAt: row.createdAt,
+  };
+}
+
 export async function getAll() {
   await simulateLatency(50, 100);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const notifications = await notificationRepository.findByUser(userId);
-  // Sort newest first
-  notifications.sort((a, b) =>
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  const { data, error } = await supabase
+    .from('notifications')
+    .select(NOTIFICATION_SELECT)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
 
-  return wrapResponse(notifications);
+  if (error) throwApiError(500, error.message);
+  return wrapResponse((data ?? []).map(toNotification));
 }
 
-/**
- * Mark a single notification as read.
- *
- * @throws ApiError(401) if not authenticated
- * @throws ApiError(404) if notification not found
- */
 export async function markAsRead(id: string) {
   await simulateLatency(50, 100);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const notification = await notificationRepository.getById(id);
-  if (!notification) throwApiError(404, 'Notification not found');
+  const { data: notification, error: fetchError } = await supabase
+    .from('notifications')
+    .select('id, user_id')
+    .eq('id', id)
+    .single();
 
-  await notificationRepository.markAsRead(id);
+  if (fetchError || !notification) throwApiError(404, 'Notification not found');
+  if (notification.user_id !== userId) throwApiError(403, 'You can only update your own notifications');
+
+  const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  if (error) throwApiError(500, error.message);
 
   return wrapResponse({ success: true });
 }
 
-/**
- * Delete a notification for the current user.
- */
 export async function remove(id: string) {
   await simulateLatency(40, 80);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const notification = await notificationRepository.getById(id);
-  if (!notification) throwApiError(404, 'Notification not found');
-  if (notification.userId !== userId) throwApiError(403, 'You can only delete your own notifications');
+  const { data: notification, error: fetchError } = await supabase
+    .from('notifications')
+    .select('id, user_id')
+    .eq('id', id)
+    .single();
 
-  await notificationRepository.delete(id);
+  if (fetchError || !notification) throwApiError(404, 'Notification not found');
+  if (notification.user_id !== userId) throwApiError(403, 'You can only delete your own notifications');
+
+  const { error } = await supabase.from('notifications').delete().eq('id', id);
+  if (error) throwApiError(500, error.message);
+
   return wrapResponse({ success: true });
 }
 
-/**
- * Mark all notifications for the current user as read.
- *
- * @throws ApiError(401) if not authenticated
- */
 export async function markAllAsRead() {
   await simulateLatency(50, 150);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  await notificationRepository.markAllAsRead(userId);
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) throwApiError(500, error.message);
 
   return wrapResponse({ success: true });
 }
 
-/**
- * Get the count of unread notifications for the current user.
- *
- * @throws ApiError(401) if not authenticated
- */
 export async function getUnreadCount() {
   await simulateLatency(30, 50);
 
   const userId = getCurrentUserId();
   if (!userId) throwApiError(401, 'Must be logged in');
 
-  const count = await notificationRepository.countUnread(userId);
-  return wrapResponse(count);
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false);
+
+  if (error) throwApiError(500, error.message);
+  return wrapResponse(count ?? 0);
 }
 
-/**
- * Create a notification (internal — used by other services, not by UI directly).
- */
 export async function create(dto: CreateNotificationDTO) {
-  const now = timestamp();
-  const notification: Notification = {
-    id: generateId('notif'),
-    userId: dto.userId,
-    type: dto.type,
-    title: dto.title,
-    content: dto.content,
-    relatedEntityId: dto.relatedEntityId,
-    relatedEntityType: dto.relatedEntityType,
-    isRead: false,
-    createdAt: now,
-  };
+  const { data, error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: dto.userId,
+      type: dto.type,
+      title: dto.title,
+      content: dto.content,
+      link: dto.link ?? null,
+      related_entity_id: dto.relatedEntityId ?? null,
+      related_entity_type: dto.relatedEntityType ?? null,
+      is_read: false,
+    })
+    .select(NOTIFICATION_SELECT)
+    .single();
 
-  await notificationRepository.create(notification);
+  if (error || !data) {
+    throwApiError(500, error?.message || 'Failed to create notification');
+  }
+
+  const notification = toNotification(data);
 
   eventBus.emit(EVENTS.NOTIFICATION_CREATED, {
     notificationId: notification.id,
